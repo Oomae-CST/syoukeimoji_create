@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>象形文字変換</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 2rem; }
+    .preview { display: flex; gap: 2rem; justify-content: center; }
+    figure { margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>象形文字変換アプリ</h1>
+
+  <input id="file" type="file" accept="image/*">
+  <button id="btn" disabled>変換</button>
+  <br>
+  <progress id="prog" value="0" max="100" style="width:300px;"></progress>
+
+  <div class="preview" style="margin-top: 1rem;">
+    <figure>
+      <figcaption>入力画像</figcaption>
+      <img id="in" width="256">
+    </figure>
+    <figure>
+      <figcaption>生成結果</figcaption>
+      <img id="out" width="256">
+    </figure>
+  </div>
+
+  <p id="log" style="margin-top:1rem;"></p>
+
+<script>
+const file   = document.getElementById("file");
+const btn    = document.getElementById("btn");
+const prog   = document.getElementById("prog");
+const log    = document.getElementById("log");
+const inImg  = document.getElementById("in");
+const outImg = document.getElementById("out");
+
+file.addEventListener("change", () => {
+  const f = file.files[0];
+  if (!f) return;
+  inImg.src = URL.createObjectURL(f);
+  btn.disabled = false;
+});
+
+btn.addEventListener("click", async () => {
+  const f = file.files[0];
+  if (!f) return;
+  btn.disabled = true;
+  prog.value = 0;
+  log.textContent = "アップロード中…";
+
+  const body = new FormData();
+  body.append("image", f);
+
+  const res = await fetch("/convert", { method:"POST", body });
+  if (!res.ok) {
+    log.textContent = "エラーが発生しました";
+    btn.disabled = false;
+    return;
+  }
+  const data = await res.json();
+
+  outImg.src = data.image;   // ← base64 データ URI
+  log.innerHTML =
+    `主題: <strong>${data.label}</strong><br>プロンプト: ${data.prompt}`;
+
+  prog.value = 100;
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
