@@ -1,76 +1,137 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>象形文字変換</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="utf-8">
+  <title>甲骨文字ジェネレーター</title>
   <style>
-    body { font-family: sans-serif; text-align: center; margin: 2rem; }
-    .preview { display: flex; gap: 2rem; justify-content: center; }
-    figure { margin: 0; }
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+
+    .image-container {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 15px;
+      flex-wrap: wrap; /* 狭い画面では折り返し */
+    }
+
+    .image-box {
+      flex: 1;
+      text-align: center;
+      min-width: 220px;
+    }
+
+    .image-box img {
+      width: 250px;   /* 元画像用デフォルトサイズ */
+      height: 250px;
+      object-fit: contain;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+      margin-top: 5px;
+    }
+
+    /* 生成画像を少し小さく表示 */
+    #result {
+      width: 200px;
+      height: 200px;
+    }
+
+    h1 {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <h1>象形文字変換アプリ</h1>
+  <h1>画像から特徴抽出 → 甲骨文字風生成</h1>
 
-  <input id="file" type="file" accept="image/*">
-  <button id="btn" disabled>変換</button>
-  <br>
-  <progress id="prog" value="0" max="100" style="width:300px;"></progress>
+  <h2>1. 画像アップロードして特徴抽出</h2>
+  <input type="file" id="imageInput">
+  <button onclick="extractFeatures()">特徴抽出</button>
 
-  <div class="preview" style="margin-top: 1rem;">
-    <figure>
-      <figcaption>入力画像</figcaption>
-      <img id="in" width="256">
-    </figure>
-    <figure>
-      <figcaption>生成結果</figcaption>
-      <img id="out" width="256">
-    </figure>
+  <!-- 横並び表示 -->
+  <div class="image-container">
+    <div class="image-box">
+      <strong>アップロードした元画像</strong><br>
+      <img id="originalImage">
+    </div>
+    <div class="image-box">
+      <strong>生成結果</strong><br>
+      <img id="result">
+    </div>
   </div>
 
-  <p id="log" style="margin-top:1rem;"></p>
+  <h2>2. 抽出された特徴</h2>
+  <ul id="features-list"></ul>
 
-<script>
-const file   = document.getElementById("file");
-const btn    = document.getElementById("btn");
-const prog   = document.getElementById("prog");
-const log    = document.getElementById("log");
-const inImg  = document.getElementById("in");
-const outImg = document.getElementById("out");
+  <button onclick="generateImage()">この特徴で生成</button>
 
-file.addEventListener("change", () => {
-  const f = file.files[0];
-  if (!f) return;
-  inImg.src = URL.createObjectURL(f);
-  btn.disabled = false;
-});
+  <script>
+    let currentImageFile = null;
+    let currentFeatures = [];
 
-btn.addEventListener("click", async () => {
-  const f = file.files[0];
-  if (!f) return;
-  btn.disabled = true;
-  prog.value = 0;
-  log.textContent = "アップロード中…";
+    async function extractFeatures() {
+      const input = document.getElementById("imageInput");
+      if (!input.files.length) {
+        alert("画像を選択してください");
+        return;
+      }
+      currentImageFile = input.files[0];
 
-  const body = new FormData();
-  body.append("image", f);
+      // 元画像プレビュー表示
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById("originalImage").src = e.target.result;
+      };
+      reader.readAsDataURL(currentImageFile);
 
-  const res = await fetch("/convert", { method:"POST", body });
-  if (!res.ok) {
-    log.textContent = "エラーが発生しました";
-    btn.disabled = false;
-    return;
-  }
-  const data = await res.json();
+      const formData = new FormData();
+      formData.append("image", currentImageFile);
 
-  outImg.src = data.image;   // ← base64 データ URI
-  log.innerHTML =
-    `主題: <strong>${data.label}</strong><br>プロンプト: ${data.prompt}`;
+      const res = await fetch("/features", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      currentFeatures = data.features || [];
 
-  prog.value = 100;
-  btn.disabled = false;
-});
-</script>
+      const container = document.getElementById("features-list");
+      container.innerHTML = "";
+      currentFeatures.forEach(f => {
+        const li = document.createElement("li");
+        li.innerHTML = `<label><input type="checkbox" value="${f}"> ${f}</label>`;
+        container.appendChild(li);
+      });
+    }
+
+    async function generateImage() {
+      if (!currentImageFile) {
+        alert("まず画像をアップロードしてください");
+        return;
+      }
+      const checked = Array.from(document.querySelectorAll("#features-list input:checked"))
+                           .map(el => el.value);
+      if (checked.length === 0) {
+        alert("特徴を選択してください");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", currentImageFile);
+      checked.forEach(f => formData.append("features", f));
+
+      const res = await fetch("/convert", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.image) {
+        document.getElementById("result").src = data.image;
+      } else {
+        alert("生成失敗: " + (data.error || "不明なエラー"));
+      }
+    }
+  </script>
 </body>
 </html>
