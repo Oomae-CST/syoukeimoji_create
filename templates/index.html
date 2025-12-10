@@ -2,84 +2,140 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>甲骨文字ジェネレーター</title>
+  <title>象形文字/漢字生成アプリ</title>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 20px;
+    body { font-family: sans-serif; margin: 0; }
+    header { padding: 16px 24px; border-bottom: 1px solid #eee; }
+    h1 { margin: 0; font-size: 20px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 0;
+      min-height: calc(100vh - 60px);
     }
+    .main {
+      padding: 20px 24px;
+    }
+    .sidebar {
+      border-left: 1px solid #eee;
+      padding: 16px;
+      background: #fafafa;
+      position: sticky;
+      top: 0;
+      height: 100%;
+      overflow: auto;
+    }
+    .section-title { margin: 12px 0 8px; font-weight: bold; }
 
     .image-container {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-      margin-top: 15px;
-      flex-wrap: wrap; /* 狭い画面では折り返し */
+      display: flex; gap: 20px; justify-content: center; margin-top: 15px; flex-wrap: wrap;
     }
-
-    .image-box {
-      flex: 1;
-      text-align: center;
-      min-width: 220px;
-    }
-
+    .image-box { flex: 1 1 220px; text-align: center; min-width: 220px; }
     .image-box img {
-      width: 250px;   /* 元画像用デフォルトサイズ */
-      height: 250px;
-      object-fit: contain;
-      border: 1px solid #ccc;
-      background: #f9f9f9;
-      margin-top: 5px;
+      width: 250px; height: 250px; object-fit: contain;
+      border: 1px solid #ccc; background: #f9f9f9; margin-top: 5px;
     }
+    #resultOracle, #resultKanji { width: 200px; height: 200px; }
 
-    /* 生成画像を少し小さく表示 */
-    #result {
-      width: 200px;
-      height: 200px;
+    .controls { margin-top: 16px; }
+    .btns { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    .subtle { color: #666; font-size: 12px; }
+
+    textarea.prompt-view {
+      width: 100%;
+      min-height: 130px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 8px;
+      border: 1px solid #ddd;
+      background: #fff;
+      border-radius: 6px;
     }
-
-    h1 {
-      text-align: center;
+    .kbd {
+      display: inline-block; padding: 1px 6px; border: 1px solid #bbb; border-bottom-width: 2px;
+      border-radius: 4px; background: #f7f7f7; font-family: ui-monospace, monospace; font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <h1>画像から特徴抽出 → 甲骨文字風生成</h1>
+  <header>
+    <h1>象形文字/漢字生成アプリ</h1>
+  </header>
 
-  <h2>1. 画像アップロードして特徴抽出</h2>
-  <input type="file" id="imageInput">
-  <button onclick="extractFeatures()">特徴抽出</button>
+  <div class="layout">
+    <!-- MAIN -->
+    <div class="main">
+      <h2>1. 画像アップロード・特徴抽出</h2>
+      <input type="file" id="imageInput">
+      <button onclick="extractFeatures()">Extract features</button>
+      <div class="subtle">抽出した特徴</div>
 
-  <!-- 横並び表示 -->
-  <div class="image-container">
-    <div class="image-box">
-      <strong>アップロードした元画像</strong><br>
-      <img id="originalImage">
+      <div class="image-container">
+        <div class="image-box">
+          <strong>元画像</strong><br>
+          <img id="originalImage" alt="original">
+        </div>
+        <div class="image-box">
+          <strong>象形文字</strong><br>
+          <img id="resultOracle" alt="oracle result">
+        </div>
+        <div class="image-box">
+          <strong>漢字</strong><br>
+          <img id="resultKanji" alt="kanji result">
+        </div>
+      </div>
+
+      <div class="controls">
+        <h2>2. 抽出された特徴（チェックして生成に使用）</h2>
+        <ul id="features-list"></ul>
+
+        <div class="btns">
+          <button onclick="generateOracle()">Generate oracle glyph</button>
+          <button id="btnKanjiFromOracle" onclick="generateKanjiFromOracle()" disabled>Oracle → Kanji (Kaisho)</button>
+        </div>
+      </div>
     </div>
-    <div class="image-box">
-      <strong>生成結果</strong><br>
-      <img id="result">
-    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="section-title">Prompts (what the app sent)</div>
+
+      <div class="section-title">1) Features (system prompt)</div>
+      <textarea id="featuresPromptView" class="prompt-view" readonly placeholder="Features extraction prompt will appear here."></textarea>
+
+      <div class="section-title">2) Oracle (image prompt)</div>
+      <textarea id="oraclePromptView" class="prompt-view" readonly placeholder="Oracle generation prompt will appear here."></textarea>
+
+      <div class="section-title">3) Structure (system prompt)</div>
+      <textarea id="structurePromptView" class="prompt-view" readonly placeholder="Structure analysis system prompt will appear here."></textarea>
+
+      <div class="section-title">4) Kanji (Kaisho) prompt</div>
+      <textarea id="kanjiPromptView" class="prompt-view" readonly placeholder="Kanji generation prompt will appear here."></textarea>
+
+      <p class="subtle">
+        Tips: これらはサーバがモデルに送った実際の文字列です。<br>
+        クリップボードへは選択 + <span class="kbd">⌘/Ctrl+C</span> でコピーできます。
+      </p>
+    </aside>
   </div>
-
-  <h2>2. 抽出された特徴</h2>
-  <ul id="features-list"></ul>
-
-  <button onclick="generateImage()">この特徴で生成</button>
 
   <script>
     let currentImageFile = null;
-    let currentFeatures = [];
+    let oracleImageId = null;
+
+    const $featuresPromptView  = () => document.getElementById("featuresPromptView");
+    const $oraclePromptView    = () => document.getElementById("oraclePromptView");
+    const $structurePromptView = () => document.getElementById("structurePromptView");
+    const $kanjiPromptView     = () => document.getElementById("kanjiPromptView");
 
     async function extractFeatures() {
       const input = document.getElementById("imageInput");
-      if (!input.files.length) {
-        alert("画像を選択してください");
-        return;
-      }
+      if (!input.files.length) { alert("Please choose an image."); return; }
       currentImageFile = input.files[0];
 
-      // 元画像プレビュー表示
+      // プレビュー
       const reader = new FileReader();
       reader.onload = e => {
         document.getElementById("originalImage").src = e.target.result;
@@ -89,31 +145,58 @@
       const formData = new FormData();
       formData.append("image", currentImageFile);
 
-      const res = await fetch("/features", {
-        method: "POST",
-        body: formData
-      });
-      const data = await res.json();
-      currentFeatures = data.features || [];
+      let res;
+      try {
+        res = await fetch("/features", { method: "POST", body: formData });
+      } catch (err) {
+        console.error("fetch /features error:", err);
+        alert("特徴抽出の通信に失敗しました。コンソールを確認してください。");
+        return;
+      }
 
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("features response not ok:", res.status, text);
+        alert("特徴抽出APIがエラーを返しました: " + res.status);
+        return;
+      }
+
+      const data = await res.json();
+      console.log("/features response:", data);
+
+      const features = data.features || [];
       const container = document.getElementById("features-list");
       container.innerHTML = "";
-      currentFeatures.forEach(f => {
+      features.forEach(f => {
         const li = document.createElement("li");
+        // ★ ここから既定チェックを外した（checked を削除）
         li.innerHTML = `<label><input type="checkbox" value="${f}"> ${f}</label>`;
         container.appendChild(li);
       });
+
+      // プロンプト表示（features system）
+      const promptText = data.features_prompt || data.features_system_prompt || "";
+      if (promptText) {
+        $featuresPromptView().value = promptText;
+      } else {
+        $featuresPromptView().value = "(no prompt text received)";
+      }
     }
 
-    async function generateImage() {
+    function getCheckedFeatures() {
+      return Array.from(
+        document.querySelectorAll("#features-list input:checked")
+      ).map(el => el.value);
+    }
+
+    async function generateOracle() {
       if (!currentImageFile) {
-        alert("まず画像をアップロードしてください");
+        alert("Please upload an image first.");
         return;
       }
-      const checked = Array.from(document.querySelectorAll("#features-list input:checked"))
-                           .map(el => el.value);
+      const checked = getCheckedFeatures();
       if (checked.length === 0) {
-        alert("特徴を選択してください");
+        alert("Select at least one feature.");
         return;
       }
 
@@ -121,15 +204,65 @@
       formData.append("image", currentImageFile);
       checked.forEach(f => formData.append("features", f));
 
-      const res = await fetch("/convert", {
-        method: "POST",
-        body: formData
-      });
+      let res;
+      try {
+        res = await fetch("/convert", { method: "POST", body: formData });
+      } catch (err) {
+        console.error("fetch /convert error:", err);
+        alert("象形生成の通信に失敗しました。");
+        return;
+      }
+
       const data = await res.json();
+      console.log("/convert response:", data);
+
       if (data.image) {
-        document.getElementById("result").src = data.image;
+        document.getElementById("resultOracle").src = data.image;
+        oracleImageId = data.oracle_image_id || null;
+        document.getElementById("btnKanjiFromOracle").disabled = !oracleImageId;
+
+        if (data.oracle_prompt) {
+          $oraclePromptView().value = data.oracle_prompt;
+        }
       } else {
-        alert("生成失敗: " + (data.error || "不明なエラー"));
+        alert("Oracle generation failed: " + (data.error || "unknown error"));
+      }
+    }
+
+    async function generateKanjiFromOracle() {
+      if (!oracleImageId) {
+        alert("Generate an oracle glyph first.");
+        return;
+      }
+
+      const checked = getCheckedFeatures();
+      const formData = new FormData();
+      formData.append("oracle_image_id", oracleImageId);
+      checked.forEach(f => formData.append("features", f)); // 任意
+
+      let res;
+      try {
+        res = await fetch("/kanji_from_oracle", { method: "POST", body: formData });
+      } catch (err) {
+        console.error("fetch /kanji_from_oracle error:", err);
+        alert("漢字生成の通信に失敗しました。");
+        return;
+      }
+
+      const data = await res.json();
+      console.log("/kanji_from_oracle response:", data);
+
+      if (data.image) {
+        document.getElementById("resultKanji").src = data.image;
+
+        if (data.structure_system_prompt) {
+          $structurePromptView().value = data.structure_system_prompt;
+        }
+        if (data.kanji_prompt) {
+          $kanjiPromptView().value = data.kanji_prompt;
+        }
+      } else {
+        alert("Kanji generation failed: " + (data.error || "unknown error"));
       }
     }
   </script>
