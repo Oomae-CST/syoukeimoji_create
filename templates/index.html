@@ -69,7 +69,7 @@
     <div class="main">
       <h2>1. 画像アップロード・特徴抽出</h2>
       <input type="file" id="imageInput">
-      <button onclick="extractFeatures()">Extract features</button>
+      <button onclick="extractFeatures()">特徴抽出</button>
       <div class="subtle">抽出した特徴</div>
 
       <div class="image-container">
@@ -92,8 +92,8 @@
         <ul id="features-list"></ul>
 
         <div class="btns">
-          <button onclick="generateOracle()">Generate oracle glyph</button>
-          <button id="btnKanjiFromOracle" onclick="generateKanjiFromOracle()" disabled>Oracle → Kanji (Kaisho)</button>
+          <button onclick="generateOracle()">象形文字に変換</button>
+          <button id="btnKanjiFromOracle" onclick="generateKanjiFromOracle()" disabled>漢字に変換</button>
         </div>
       </div>
     </div>
